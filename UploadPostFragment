@@ -1,0 +1,204 @@
+
+public class UploadPostFragment extends Fragment implements NIIDAsyncHandler.PMAsynchInterface, PermissionRequest.Response, VisiblyAsyncHandler.PMAsynchInterface
+{
+
+
+
+    public static int VESDK_RESULT = 100;
+    public static int GALLERY_RESULT = 200;
+
+
+    private void openSystemGalleryToSelectAnVideo() {
+        Intent intent = new Intent(Intent.ACTION_PICK);
+        intent.setDataAndType(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,"video/*");
+        if (intent.resolveActivity(getActivity().getPackageManager()) != null) {
+            activity.startActivityForResult(intent, GALLERY_RESULT);
+        } else {
+            Toast.makeText(activity, "No Gallery APP installed", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void openEditor(Uri inputImage) {
+        VideoEditorSettingsList settingsList1 = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR2) {
+            settingsList1 = createVesdkSettingsList();
+            settingsList1.getSettingsModel(LoadSettings.class).setSource(inputImage);
+
+            new VideoEditorBuilder(GlobalVariables.mActivity)
+                    .setSettingsList(settingsList1)
+                    .startActivityForResult(GlobalVariables.mActivity, VESDK_RESULT);
+        } else {
+            Toast.makeText(activity, "Video support needs Android 4.3", Toast.LENGTH_LONG).show();
+            return;
+        }
+     }
+
+    private VideoEditorSettingsList createVesdkSettingsList() {
+        // Create a empty new SettingsList and apply the changes on this referance.
+        VideoEditorSettingsList settingsList = new VideoEditorSettingsList();
+
+        // If you include our asset Packs and you use our UI you also need to add them to the UI,
+        // otherwise they are only available for the backend
+        // See the specific feature sections of our guides if you want to know how to add our own Assets.
+
+        settingsList.getSettingsModel(UiConfigFilter.class).setFilterList(
+                FilterPackBasic.getFilterPack()
+        );
+
+        settingsList.getSettingsModel(UiConfigText.class).setFontList(
+                FontPackBasic.getFontPack()
+        );
+
+        settingsList.getSettingsModel(UiConfigFrame.class).setFrameList(
+                FramePackBasic.getFramePack()
+        );
+
+        settingsList.getSettingsModel(UiConfigOverlay.class).setOverlayList(
+                OverlayPackBasic.getOverlayPack()
+        );
+
+        settingsList.getSettingsModel(UiConfigSticker.class).setStickerLists(
+                StickerPackEmoticons.getStickerCategory(),
+                StickerPackShapes.getStickerCategory()
+        );
+
+        // Set custom editor image export settings
+        settingsList.getSettingsModel(SaveSettings.class)
+                .setExportDir(Directory.DCIM, "SomeFolderName")
+                .setExportPrefix("result_")
+                .setSavePolicy(SaveSettings.SavePolicy.RETURN_ALWAYS_ONLY_OUTPUT);
+
+        return settingsList;
+    }
+
+
+    //Getting result on on activity result
+    public void onActivityResults(int requestCode, int resultCode, Intent data)
+    {
+        boolean isFoundInArray = false; // to check if the source is found in array
+        Log.d("onActivityResults", "requestCode==="+requestCode+ "resultcode==="+resultCode);
+
+
+
+        if (resultCode == RESULT_OK && requestCode == GALLERY_RESULT) {
+            // Open Editor with some uri in this case with an image selected from the system gallery.
+            Uri selectedImage = data.getData();
+            openEditor(selectedImage);
+
+        } else if (resultCode == RESULT_OK && requestCode == VESDK_RESULT) {
+            // Editor has saved an Image.
+            Uri resultURI = data.getParcelableExtra(ImgLyIntent.RESULT_IMAGE_URI);
+            Uri sourceURI = data.getParcelableExtra(ImgLyIntent.SOURCE_IMAGE_URI);
+
+            // Scan result uri to show it up in the Gallery
+            if (resultURI != null) {
+                activity.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE).setData(resultURI));
+            }
+
+            // Scan source uri to show it up in the Gallery
+            if (sourceURI != null) {
+                activity.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE).setData(sourceURI));
+            }
+
+            Log.i("PESDK", "Source image is located here " + sourceURI);
+            Log.i("PESDK", "Result image is located here " + resultURI);
+
+            // TODO: Do something with the result image
+
+            // OPTIONAL: read the latest state to save it as a serialisation
+            SettingsList lastState = data.getParcelableExtra(ImgLyIntent.SETTINGS_LIST);
+            try {
+                new PESDKFileWriter(lastState).writeJson(new File(
+                        Environment.getExternalStorageDirectory(),
+                        "serialisationReadyToReadWithPESDKFileReader.json"
+                ));
+            } catch (IOException e) { e.printStackTrace(); }
+
+        } else if (resultCode == RESULT_CANCELED && requestCode == VESDK_RESULT) {
+            // Editor was canceled
+            Uri sourceURI = data.getParcelableExtra(ImgLyIntent.SOURCE_IMAGE_URI);
+            // TODO: Do something with the source...
+        }
+       }
+        
+        
+        
+        
+  
+
+public UploadPostFragment() {
+        // Required empty public constructor
+    }
+    @Override
+    public void onAttachFragment(Fragment childFragment) {
+        super.onAttachFragment(childFragment);
+        }
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        Log.d("onpostfragment","onCreate");
+        super.onCreate(savedInstanceState);
+
+        if (getArguments() != null) {
+           // getUserTag(GlobalVariables.feed_identity);
+            mParam1 = getArguments().getString(ARG_PARAM1);
+            mParam2 = getArguments().getString(ARG_PARAM2);
+        }
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+
+        // Inflate the layout for this fragment
+        return inflater.inflate(R.layout.fragment_upload_post, container, false);
+
+    }
+
+    
+   @Override
+    public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
+
+        super.onViewCreated(view, savedInstanceState);
+       
+       
+       imageview_Gallery.setOnClickListener(new OnClickListener()
+        {
+            @Override
+            public void onClick(View v)
+            {
+                if(!GlobalVariables.isGiphy) {
+
+                            if (issocialMediaSelected(GlobalVariables.getCheckedAccount)) {
+                                if (doesArrayContainsVideo(UploadActivity.mediatDTOS)) {
+                                    GlobalVariables.showToast(activity, activity.getString(R.string.single_video_linkedin_error));
+                                } else {
+                                    if (UploadActivity.mediatDTOS.size() < maxMedia) {
+                                        openGallery();
+                                    } else {
+                                        GlobalVariables.showToast(activity, activity.getString(R.string.single_video_linkedin_error));
+                                    }
+                                }
+                            } else {
+                                if (UploadActivity.mediatDTOS.size() < maxMedia) {
+                                    openSystemGalleryToSelectAnVideo();
+                                  //  openGallery();
+                                } else {
+
+                                    GlobalVariables.showToast(activity, activity.getString(R.string.max_create_post_limit));
+                                }
+                            }
+                }
+                else
+                {
+                    GlobalVariables.showToast(activity, getString(R.string.gif_validation));
+                }
+            }
+        });
+        
+        }
+     }
+       
+       
+       
+     
